@@ -52,6 +52,19 @@ public class SupplierController {
         return supplierRepository.save(supplier);
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSupplier(@PathVariable Long id) {
+
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Supplier not found with id: " + id
+                ));
+
+        supplierRepository.delete(supplier);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Supplier createSupplier(@Valid @RequestBody SupplierRequest request) {
