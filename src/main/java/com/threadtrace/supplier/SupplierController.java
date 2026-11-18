@@ -1,10 +1,12 @@
 package com.threadtrace.supplier;
 
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/suppliers")
@@ -17,8 +19,23 @@ public class SupplierController {
     }
 
     @GetMapping
-    public List<Supplier> getAllSuppliers() {
-        return supplierRepository.findAll();
+    public SupplierPageResponse<Supplier> getAllSuppliers(
+            @PageableDefault(size = 10, sort = "id") Pageable pageable) {
+
+        Page<Supplier> supplierPage = supplierRepository.findAll(pageable);
+
+        SupplierPageResponse.PageMetadata metadata =
+                new SupplierPageResponse.PageMetadata(
+                        supplierPage.getSize(),
+                        supplierPage.getNumber(),
+                        supplierPage.getTotalElements(),
+                        supplierPage.getTotalPages()
+                );
+
+        return new SupplierPageResponse<>(
+                supplierPage.getContent(),
+                metadata
+        );
     }
 
     @GetMapping("/{id}")
