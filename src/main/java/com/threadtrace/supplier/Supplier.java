@@ -1,31 +1,42 @@
 package com.threadtrace.supplier;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "suppliers")
+@Schema(description = "Represents a garment supply-chain supplier")
 public class Supplier {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Schema(description = "Unique supplier ID", example = "1", accessMode = Schema.AccessMode.READ_ONLY)
     private Long id;
 
     @Column(nullable = false, length = 150)
+    @Schema(description = "Supplier's registered name", example = "ThreadTrace Textile Ltd")
     private String name;
 
+    @Schema(description = "Supplier contact person's name", example = "Rahim Ahmed")
     private String contactPerson;
 
+    @Schema(description = "Supplier email address", example = "rahim@threadtrace.com")
     private String email;
 
+    @Schema(description = "Supplier contact number", example = "01712345678")
     private String phone;
 
+    @Schema(description = "Supplier's country", example = "Bangladesh")
     private String country;
 
+    @Schema(description = "Supplier's business address", example = "Savar, Dhaka, Bangladesh")
     private String address;
 
+    @Schema(description = "Record creation timestamp", accessMode = Schema.AccessMode.READ_ONLY)
     private LocalDateTime createdAt;
 
+    @Schema(description = "Record last update timestamp", accessMode = Schema.AccessMode.READ_ONLY)
     private LocalDateTime updatedAt;
 
     @PrePersist
