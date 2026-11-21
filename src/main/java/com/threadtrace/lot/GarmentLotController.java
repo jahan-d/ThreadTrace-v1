@@ -80,7 +80,7 @@ public class GarmentLotController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a garment lot")
+    @Operation(summary = "Archive a garment lot")
     public ResponseEntity<Void> deleteLot(@PathVariable Long id) {
 
         garmentLotService.deleteLot(id);

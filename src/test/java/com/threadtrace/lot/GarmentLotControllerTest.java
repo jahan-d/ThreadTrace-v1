@@ -164,6 +164,7 @@ class GarmentLotControllerTest {
     @Test
     void shouldDeleteGarmentLot() throws Exception {
 
+        // Create a garment lot.
         String response = mockMvc.perform(post("/api/garment-lots")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
@@ -174,10 +175,60 @@ class GarmentLotControllerTest {
 
         Long lotId = objectMapper.readTree(response).get("id").asLong();
 
+        // DELETE should archive the lot instead of hard deleting it.
         mockMvc.perform(delete("/api/garment-lots/" + lotId))
             .andExpect(status().isNoContent());
 
+        // Verify that the lot still exists with ARCHIVED status.
         mockMvc.perform(get("/api/garment-lots/" + lotId))
-            .andExpect(status().isNotFound());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ARCHIVED"));
+
+        // Verify that the ARCHIVE event was recorded.
+        mockMvc.perform(get("/api/garment-lots/" + lotId + "/events"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].eventType").value("ARCHIVE"));
+
+        // Repeated DELETE should be rejected.
+        mockMvc.perform(delete("/api/garment-lots/" + lotId))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void shouldRejectUpdatingArchivedLot() throws Exception {
+
+        // Create a garment lot.
+        String response = mockMvc.perform(post("/api/garment-lots")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest())))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long lotId = objectMapper.readTree(response).get("id").asLong();
+
+        // Archive the lot.
+        mockMvc.perform(delete("/api/garment-lots/" + lotId))
+            .andExpect(status().isNoContent());
+
+        // Attempt to update the archived lot.
+        GarmentLotUpdateRequest updateRequest = new GarmentLotUpdateRequest(
+            "LOT-2026-UPDATED",
+            supplierId,
+            "Updated description"
+        );
+
+        mockMvc.perform(put("/api/garment-lots/" + lotId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
+            .andExpect(status().isConflict());
+
+        // Verify that the original lot data remains unchanged.
+        mockMvc.perform(get("/api/garment-lots/" + lotId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ARCHIVED"))
+            .andExpect(jsonPath("$.lotNumber").value("LOT-2026-0001"));
     }
 }

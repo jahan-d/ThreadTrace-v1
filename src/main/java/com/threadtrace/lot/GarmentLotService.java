@@ -1,5 +1,8 @@
 package com.threadtrace.lot;
 
+import com.threadtrace.event.LotEventRequest;
+import com.threadtrace.event.LotEventService;
+import com.threadtrace.event.LotEventType;
 import com.threadtrace.supplier.Supplier;
 import com.threadtrace.supplier.SupplierRepository;
 import org.springframework.data.domain.Page;
@@ -9,21 +12,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+
 @Service
 public class GarmentLotService {
 
     private final GarmentLotRepository garmentLotRepository;
     private final SupplierRepository supplierRepository;
     private final GarmentLotMapper garmentLotMapper;
+    private final LotEventService lotEventService;
 
     public GarmentLotService(
             GarmentLotRepository garmentLotRepository,
             SupplierRepository supplierRepository,
-            GarmentLotMapper garmentLotMapper
+            GarmentLotMapper garmentLotMapper,
+            LotEventService lotEventService
     ) {
         this.garmentLotRepository = garmentLotRepository;
         this.supplierRepository = supplierRepository;
         this.garmentLotMapper = garmentLotMapper;
+        this.lotEventService = lotEventService;
     }
 
     @Transactional
@@ -83,6 +91,13 @@ public class GarmentLotService {
                 "Garment lot not found"
             ));
 
+        if (lot.getStatus() == LotStatus.ARCHIVED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Archived lots cannot be updated"
+            );
+        }
+
         if (garmentLotRepository.existsByLotNumberAndIdNot(
                 request.lotNumber(), id)) {
             throw new ResponseStatusException(
@@ -109,12 +124,12 @@ public class GarmentLotService {
     @Transactional
     public void deleteLot(Long id) {
 
-        GarmentLot lot = garmentLotRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Garment lot not found"
-            ));
+        LotEventRequest archiveRequest = new LotEventRequest(
+            LotEventType.ARCHIVE,
+            LocalDateTime.now(),
+            "Lot archived"
+        );
 
-        garmentLotRepository.delete(lot);
+        lotEventService.appendEvent(id, archiveRequest);
     }
 }
