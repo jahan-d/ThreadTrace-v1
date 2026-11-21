@@ -73,8 +73,10 @@ public class GarmentLotService {
     }
 
     @Transactional
-    public GarmentLotResponse updateLot(Long id, GarmentLotRequest request) {
-
+    public GarmentLotResponse updateLot(
+            Long id,
+            GarmentLotUpdateRequest request
+    ) {
         GarmentLot lot = garmentLotRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
@@ -97,7 +99,6 @@ public class GarmentLotService {
 
         lot.setLotNumber(request.lotNumber());
         lot.setSupplier(supplier);
-        lot.setStatus(request.status());
         lot.setDescription(request.description());
 
         GarmentLot updatedLot = garmentLotRepository.save(lot);

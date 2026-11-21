@@ -72,11 +72,10 @@ public class GarmentLotController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update a garment lot")
+    @Operation(summary = "Update garment lot metadata")
     public ResponseEntity<GarmentLotResponse> updateLot(
             @PathVariable Long id,
-            @Valid @RequestBody GarmentLotRequest request) {
-
+            @Valid @RequestBody GarmentLotUpdateRequest request) {
         return ResponseEntity.ok(garmentLotService.updateLot(id, request));
     }
 

@@ -136,7 +136,6 @@ class GarmentLotControllerTest {
 
     @Test
     void shouldUpdateGarmentLot() throws Exception {
-
         String response = mockMvc.perform(post("/api/garment-lots")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
@@ -147,18 +146,18 @@ class GarmentLotControllerTest {
 
         Long lotId = objectMapper.readTree(response).get("id").asLong();
 
-        GarmentLotRequest updatedRequest = new GarmentLotRequest(
-            "LOT-2026-0001",
-            supplierId,
-            LotStatus.IN_PRODUCTION,
-            "Production started"
-        );
+        GarmentLotUpdateRequest updatedRequest =
+            new GarmentLotUpdateRequest(
+                "LOT-2026-0001",
+                supplierId,
+                "Production started"
+            );
 
         mockMvc.perform(put("/api/garment-lots/" + lotId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatedRequest)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("IN_PRODUCTION"))
+            .andExpect(jsonPath("$.status").value("RAW_MATERIAL"))
             .andExpect(jsonPath("$.description").value("Production started"));
     }
 
