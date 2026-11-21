@@ -3,6 +3,7 @@ package com.threadtrace.lot;
 import tools.jackson.databind.ObjectMapper;
 import com.threadtrace.supplier.Supplier;
 import com.threadtrace.supplier.SupplierRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -45,25 +48,27 @@ class GarmentLotControllerTest {
             "LOT-2026-0001",
             supplierId,
             LotStatus.RAW_MATERIAL,
-            "1000 kg of cotton fabric"
+            "Cotton fabric",
+            new BigDecimal("1000.0000"),
+            QuantityUnit.KG
         );
     }
 
     @Test
     void shouldCreateGarmentLot() throws Exception {
-
         mockMvc.perform(post("/api/garment-lots")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.lotNumber").value("LOT-2026-0001"))
             .andExpect(jsonPath("$.supplierName").value("Test Textile Ltd"))
-            .andExpect(jsonPath("$.status").value("RAW_MATERIAL"));
+            .andExpect(jsonPath("$.status").value("RAW_MATERIAL"))
+            .andExpect(jsonPath("$.quantity").value(1000.0))
+            .andExpect(jsonPath("$.unit").value("KG"));
     }
 
     @Test
     void shouldRejectDuplicateLotNumber() throws Exception {
-
         String request = objectMapper.writeValueAsString(validRequest());
 
         mockMvc.perform(post("/api/garment-lots")
@@ -79,12 +84,13 @@ class GarmentLotControllerTest {
 
     @Test
     void shouldRejectInvalidSupplier() throws Exception {
-
         GarmentLotRequest request = new GarmentLotRequest(
             "LOT-2026-0002",
             999999L,
             LotStatus.RAW_MATERIAL,
-            "Cotton fabric"
+            "Cotton fabric",
+            new BigDecimal("500.0000"),
+            QuantityUnit.KG
         );
 
         mockMvc.perform(post("/api/garment-lots")
@@ -95,12 +101,47 @@ class GarmentLotControllerTest {
 
     @Test
     void shouldRejectEmptyLotNumber() throws Exception {
-
         GarmentLotRequest request = new GarmentLotRequest(
             "",
             supplierId,
             LotStatus.RAW_MATERIAL,
-            "Cotton fabric"
+            "Cotton fabric",
+            new BigDecimal("500.0000"),
+            QuantityUnit.KG
+        );
+
+        mockMvc.perform(post("/api/garment-lots")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectZeroQuantity() throws Exception {
+        GarmentLotRequest request = new GarmentLotRequest(
+            "LOT-2026-0003",
+            supplierId,
+            LotStatus.RAW_MATERIAL,
+            "Cotton fabric",
+            BigDecimal.ZERO,
+            QuantityUnit.KG
+        );
+
+        mockMvc.perform(post("/api/garment-lots")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectMissingQuantityUnit() throws Exception {
+        GarmentLotRequest request = new GarmentLotRequest(
+            "LOT-2026-0004",
+            supplierId,
+            LotStatus.RAW_MATERIAL,
+            "Cotton fabric",
+            new BigDecimal("500.0000"),
+            null
         );
 
         mockMvc.perform(post("/api/garment-lots")
@@ -111,7 +152,6 @@ class GarmentLotControllerTest {
 
     @Test
     void shouldGetGarmentLotById() throws Exception {
-
         String response = mockMvc.perform(post("/api/garment-lots")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
@@ -124,12 +164,13 @@ class GarmentLotControllerTest {
 
         mockMvc.perform(get("/api/garment-lots/" + lotId))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.lotNumber").value("LOT-2026-0001"));
+            .andExpect(jsonPath("$.lotNumber").value("LOT-2026-0001"))
+            .andExpect(jsonPath("$.quantity").value(1000.0))
+            .andExpect(jsonPath("$.unit").value("KG"));
     }
 
     @Test
     void shouldReturnNotFoundForMissingLot() throws Exception {
-
         mockMvc.perform(get("/api/garment-lots/999999"))
             .andExpect(status().isNotFound());
     }
@@ -158,13 +199,13 @@ class GarmentLotControllerTest {
                 .content(objectMapper.writeValueAsString(updatedRequest)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("RAW_MATERIAL"))
-            .andExpect(jsonPath("$.description").value("Production started"));
+            .andExpect(jsonPath("$.description").value("Production started"))
+            .andExpect(jsonPath("$.quantity").value(1000.0))
+            .andExpect(jsonPath("$.unit").value("KG"));
     }
 
     @Test
     void shouldDeleteGarmentLot() throws Exception {
-
-        // Create a garment lot.
         String response = mockMvc.perform(post("/api/garment-lots")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
@@ -175,30 +216,24 @@ class GarmentLotControllerTest {
 
         Long lotId = objectMapper.readTree(response).get("id").asLong();
 
-        // DELETE should archive the lot instead of hard deleting it.
         mockMvc.perform(delete("/api/garment-lots/" + lotId))
             .andExpect(status().isNoContent());
 
-        // Verify that the lot still exists with ARCHIVED status.
         mockMvc.perform(get("/api/garment-lots/" + lotId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ARCHIVED"));
 
-        // Verify that the ARCHIVE event was recorded.
         mockMvc.perform(get("/api/garment-lots/" + lotId + "/events"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].eventType").value("ARCHIVE"));
 
-        // Repeated DELETE should be rejected.
         mockMvc.perform(delete("/api/garment-lots/" + lotId))
             .andExpect(status().isConflict());
     }
 
     @Test
     void shouldRejectUpdatingArchivedLot() throws Exception {
-
-        // Create a garment lot.
         String response = mockMvc.perform(post("/api/garment-lots")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
@@ -209,11 +244,9 @@ class GarmentLotControllerTest {
 
         Long lotId = objectMapper.readTree(response).get("id").asLong();
 
-        // Archive the lot.
         mockMvc.perform(delete("/api/garment-lots/" + lotId))
             .andExpect(status().isNoContent());
 
-        // Attempt to update the archived lot.
         GarmentLotUpdateRequest updateRequest = new GarmentLotUpdateRequest(
             "LOT-2026-UPDATED",
             supplierId,
@@ -225,7 +258,6 @@ class GarmentLotControllerTest {
                 .content(objectMapper.writeValueAsString(updateRequest)))
             .andExpect(status().isConflict());
 
-        // Verify that the original lot data remains unchanged.
         mockMvc.perform(get("/api/garment-lots/" + lotId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ARCHIVED"))

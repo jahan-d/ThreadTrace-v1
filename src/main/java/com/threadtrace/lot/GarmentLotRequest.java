@@ -1,13 +1,17 @@
 package com.threadtrace.lot;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
+
 @Schema(
     name = "GarmentLotRequest",
-    description = "Request body for creating or updating a garment lot"
+    description = "Request body for creating a garment lot"
 )
 public record GarmentLotRequest(
 
@@ -35,9 +39,27 @@ public record GarmentLotRequest(
 
     @Schema(
         description = "Additional information about the lot",
-        example = "1000 kg of cotton fabric"
+        example = "Cotton fabric"
     )
     @Size(max = 500, message = "Description cannot exceed 500 characters")
-    String description
+    String description,
+
+    @Schema(
+        description = "Available quantity of the garment lot",
+        example = "1000.0000"
+    )
+    @NotNull(message = "Quantity is required")
+    @DecimalMin(value = "0.0", inclusive = false,
+        message = "Quantity must be greater than zero")
+    @Digits(integer = 15, fraction = 4,
+        message = "Quantity can have at most 15 integer digits and 4 decimal places")
+    BigDecimal quantity,
+
+    @Schema(
+        description = "Measurement unit of the lot quantity",
+        example = "KG"
+    )
+    @NotNull(message = "Quantity unit is required")
+    QuantityUnit unit
 
 ) {}

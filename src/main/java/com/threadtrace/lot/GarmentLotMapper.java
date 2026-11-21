@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 public class GarmentLotMapper {
 
     public GarmentLotResponse toResponse(GarmentLot lot) {
+
         return new GarmentLotResponse(
             lot.getId(),
             lot.getLotNumber(),
@@ -13,6 +14,8 @@ public class GarmentLotMapper {
             lot.getSupplier().getName(),
             lot.getStatus(),
             lot.getDescription(),
+            lot.getQuantity(),
+            lot.getUnit(),
             lot.getCreatedAt(),
             lot.getUpdatedAt()
         );

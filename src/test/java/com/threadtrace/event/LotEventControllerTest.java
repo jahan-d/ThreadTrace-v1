@@ -2,6 +2,7 @@ package com.threadtrace.event;
 
 import com.threadtrace.lot.GarmentLotRequest;
 import com.threadtrace.lot.LotStatus;
+import com.threadtrace.lot.QuantityUnit;
 import com.threadtrace.lot.GarmentLotResponse;
 import com.threadtrace.supplier.Supplier;
 import com.threadtrace.supplier.SupplierRepository;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import tools.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -69,7 +71,9 @@ class LotEventControllerTest {
             "LOT-2026-0001",
             supplierId,
             LotStatus.RAW_MATERIAL,
-            "1000 kg of cotton fabric"
+            "Cotton fabric",
+            new BigDecimal("1000.0000"),
+            QuantityUnit.KG
         );
     }
 

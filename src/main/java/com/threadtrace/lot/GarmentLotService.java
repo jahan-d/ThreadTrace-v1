@@ -5,6 +5,7 @@ import com.threadtrace.event.LotEventService;
 import com.threadtrace.event.LotEventType;
 import com.threadtrace.supplier.Supplier;
 import com.threadtrace.supplier.SupplierRepository;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -23,10 +24,10 @@ public class GarmentLotService {
     private final LotEventService lotEventService;
 
     public GarmentLotService(
-            GarmentLotRepository garmentLotRepository,
-            SupplierRepository supplierRepository,
-            GarmentLotMapper garmentLotMapper,
-            LotEventService lotEventService
+        GarmentLotRepository garmentLotRepository,
+        SupplierRepository supplierRepository,
+        GarmentLotMapper garmentLotMapper,
+        LotEventService lotEventService
     ) {
         this.garmentLotRepository = garmentLotRepository;
         this.supplierRepository = supplierRepository;
@@ -51,10 +52,13 @@ public class GarmentLotService {
             ));
 
         GarmentLot lot = new GarmentLot();
+
         lot.setLotNumber(request.lotNumber());
         lot.setSupplier(supplier);
         lot.setStatus(request.status());
         lot.setDescription(request.description());
+        lot.setQuantity(request.quantity());
+        lot.setUnit(request.unit());
 
         GarmentLot savedLot = garmentLotRepository.save(lot);
 
@@ -82,9 +86,10 @@ public class GarmentLotService {
 
     @Transactional
     public GarmentLotResponse updateLot(
-            Long id,
-            GarmentLotUpdateRequest request
+        Long id,
+        GarmentLotUpdateRequest request
     ) {
+
         GarmentLot lot = garmentLotRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
@@ -99,7 +104,8 @@ public class GarmentLotService {
         }
 
         if (garmentLotRepository.existsByLotNumberAndIdNot(
-                request.lotNumber(), id)) {
+            request.lotNumber(), id
+        )) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Lot number already exists"
@@ -115,6 +121,9 @@ public class GarmentLotService {
         lot.setLotNumber(request.lotNumber());
         lot.setSupplier(supplier);
         lot.setDescription(request.description());
+
+        // Quantity and unit are intentionally not updated here.
+        // Future transformations will control inventory changes.
 
         GarmentLot updatedLot = garmentLotRepository.save(lot);
 

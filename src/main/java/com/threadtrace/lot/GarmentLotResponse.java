@@ -1,6 +1,8 @@
 package com.threadtrace.lot;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Schema(
@@ -24,8 +26,14 @@ public record GarmentLotResponse(
     @Schema(description = "Current lot status", example = "RAW_MATERIAL")
     LotStatus status,
 
-    @Schema(description = "Additional lot information", example = "1000 kg of cotton fabric")
+    @Schema(description = "Additional lot information", example = "Cotton fabric")
     String description,
+
+    @Schema(description = "Available quantity of the lot", example = "1000.0000")
+    BigDecimal quantity,
+
+    @Schema(description = "Measurement unit of the lot", example = "KG")
+    QuantityUnit unit,
 
     @Schema(description = "Lot creation timestamp")
     LocalDateTime createdAt,

@@ -2,6 +2,8 @@ package com.threadtrace.lot;
 
 import com.threadtrace.supplier.Supplier;
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,6 +27,13 @@ public class GarmentLot {
 
     @Column(length = 500)
     private String description;
+
+    @Column(precision = 19, scale = 4)
+    private BigDecimal quantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private QuantityUnit unit;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -78,6 +87,22 @@ public class GarmentLot {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public BigDecimal getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(BigDecimal quantity) {
+        this.quantity = quantity;
+    }
+
+    public QuantityUnit getUnit() {
+        return unit;
+    }
+
+    public void setUnit(QuantityUnit unit) {
+        this.unit = unit;
     }
 
     public LocalDateTime getCreatedAt() {
