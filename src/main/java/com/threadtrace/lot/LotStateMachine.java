@@ -75,6 +75,8 @@ public class LotStateMachine {
                 yield LotStatus.COMPLETED;
             }
 
+            case TRANSFORMATION_INPUT, TRANSFORMATION_OUTPUT -> currentStatus;
+
             case ARCHIVE -> LotStatus.ARCHIVED;
         };
     }

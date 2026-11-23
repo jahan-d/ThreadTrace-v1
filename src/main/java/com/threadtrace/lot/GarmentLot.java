@@ -14,6 +14,10 @@ public class GarmentLot {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(nullable = false, unique = true, length = 50)
     private String lotNumber;
 
@@ -55,6 +59,10 @@ public class GarmentLot {
 
     public Long getId() {
         return id;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     public String getLotNumber() {

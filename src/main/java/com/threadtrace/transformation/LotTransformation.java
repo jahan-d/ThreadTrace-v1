@@ -1,6 +1,9 @@
 package com.threadtrace.transformation;
 
+import com.threadtrace.lot.QuantityUnit;
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,6 +30,13 @@ public class LotTransformation {
     @Column(length = 1000, updatable = false)
     private String notes;
 
+    @Column(nullable = false, precision = 19, scale = 4, updatable = false)
+    private BigDecimal wasteQuantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, updatable = false)
+    private QuantityUnit wasteUnit;
+
     protected LotTransformation() {
     }
 
@@ -34,12 +44,16 @@ public class LotTransformation {
             LotTransformationType transformationType,
             LocalDateTime occurredAt,
             String performedBy,
-            String notes
+            String notes,
+            BigDecimal wasteQuantity,
+            QuantityUnit wasteUnit
     ) {
         this.transformationType = transformationType;
         this.occurredAt = occurredAt;
         this.performedBy = performedBy;
         this.notes = notes;
+        this.wasteQuantity = wasteQuantity;
+        this.wasteUnit = wasteUnit;
     }
 
     @PrePersist
@@ -71,5 +85,13 @@ public class LotTransformation {
 
     public String getNotes() {
         return notes;
+    }
+
+    public BigDecimal getWasteQuantity() {
+        return wasteQuantity;
+    }
+
+    public QuantityUnit getWasteUnit() {
+        return wasteUnit;
     }
 }
