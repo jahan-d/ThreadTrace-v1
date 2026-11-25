@@ -3,9 +3,11 @@ package com.threadtrace.lot;
 import com.threadtrace.event.LotEventRequest;
 import com.threadtrace.event.LotEventService;
 import com.threadtrace.event.LotEventType;
+import com.threadtrace.lot.event.LotCreatedEvent;
 import com.threadtrace.supplier.Supplier;
 import com.threadtrace.supplier.SupplierRepository;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -22,17 +24,20 @@ public class GarmentLotService {
     private final SupplierRepository supplierRepository;
     private final GarmentLotMapper garmentLotMapper;
     private final LotEventService lotEventService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GarmentLotService(
         GarmentLotRepository garmentLotRepository,
         SupplierRepository supplierRepository,
         GarmentLotMapper garmentLotMapper,
-        LotEventService lotEventService
+        LotEventService lotEventService,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.garmentLotRepository = garmentLotRepository;
         this.supplierRepository = supplierRepository;
         this.garmentLotMapper = garmentLotMapper;
         this.lotEventService = lotEventService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -61,6 +66,16 @@ public class GarmentLotService {
         lot.setUnit(request.unit());
 
         GarmentLot savedLot = garmentLotRepository.save(lot);
+
+        eventPublisher.publishEvent(new LotCreatedEvent(
+                savedLot.getId(),
+                savedLot.getLotNumber(),
+                supplier.getId(),
+                savedLot.getStatus(),
+                savedLot.getQuantity(),
+                savedLot.getUnit(),
+                savedLot.getCreatedAt()
+        ));
 
         return garmentLotMapper.toResponse(savedLot);
     }

@@ -8,6 +8,8 @@ import com.threadtrace.lot.GarmentLotRepository;
 import com.threadtrace.lot.LotStatus;
 import com.threadtrace.lot.QuantityUnit;
 import com.threadtrace.supplier.SupplierRepository;
+import com.threadtrace.transformation.event.LotTransformationCompletedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class LotTransformationService {
     private final SupplierRepository supplierRepository;
     private final LotEventService lotEventService;
     private final LotCycleValidationService cycleValidationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public LotTransformationService(
             LotTransformationRepository transformationRepository,
@@ -48,7 +51,8 @@ public class LotTransformationService {
             GarmentLotRepository garmentLotRepository,
             SupplierRepository supplierRepository,
             LotEventService lotEventService,
-            LotCycleValidationService cycleValidationService
+            LotCycleValidationService cycleValidationService,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.transformationRepository = transformationRepository;
         this.inputRepository = inputRepository;
@@ -57,6 +61,7 @@ public class LotTransformationService {
         this.supplierRepository = supplierRepository;
         this.lotEventService = lotEventService;
         this.cycleValidationService = cycleValidationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -183,6 +188,23 @@ public class LotTransformationService {
                     )
             );
         }
+
+        List<Long> inputLotIds = request.inputs().stream()
+                .map(LotTransformationRequest.InputLotRequest::lotId)
+                .toList();
+        List<Long> outputLotIds = outputSummaries.stream()
+                .map(LotTransformationResponse.OutputLotSummary::lotId)
+                .toList();
+
+        eventPublisher.publishEvent(new LotTransformationCompletedEvent(
+                transformation.getId(),
+                transformation.getTransformationType(),
+                inputLotIds,
+                outputLotIds,
+                transformation.getWasteQuantity(),
+                transformation.getWasteUnit(),
+                transformation.getOccurredAt()
+        ));
 
         return new LotTransformationResponse(
                 transformation.getId(),
