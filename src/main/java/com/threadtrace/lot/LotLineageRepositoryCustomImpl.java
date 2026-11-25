@@ -1,15 +1,21 @@
 package com.threadtrace.lot;
 
+import com.threadtrace.transformation.LotTransformationType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Repository
 public class LotLineageRepositoryCustomImpl
         implements LotLineageRepositoryCustom {
 
     private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     private static final String UPSTREAM_SQL = """
             WITH RECURSIVE upstream (
@@ -91,10 +97,58 @@ public class LotLineageRepositoryCustomImpl
             FROM downstream
             """;
 
+    private static final String INPUT_EDGES_SQL = """
+            SELECT
+                lot_id,
+                transformation_id,
+                quantity,
+                unit
+            FROM transformation_inputs
+            WHERE transformation_id IN (:transformationIds)
+            ORDER BY transformation_id, id
+            """;
+
+    private static final String OUTPUT_EDGES_SQL = """
+            SELECT
+                lot_id,
+                transformation_id,
+                quantity,
+                unit
+            FROM transformation_outputs
+            WHERE transformation_id IN (:transformationIds)
+            ORDER BY transformation_id, id
+            """;
+
+    private static final String LOTS_BY_IDS_SQL = """
+            SELECT
+                id,
+                lot_number,
+                status,
+                quantity,
+                unit
+            FROM garment_lots
+            WHERE id IN (:lotIds)
+            ORDER BY id
+            """;
+
+    private static final String TRANSFORMATIONS_BY_IDS_SQL = """
+            SELECT
+                id,
+                transformation_type,
+                occurred_at,
+                performed_by,
+                waste_quantity,
+                waste_unit
+            FROM lot_transformations
+            WHERE id IN (:transformationIds)
+            ORDER BY id
+            """;
+
     public LotLineageRepositoryCustomImpl(
             JdbcTemplate jdbcTemplate
     ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.namedParameterJdbcTemplate = new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
     private List<TraversalRow> findUpstreamRows(Long rootLotId) {
@@ -131,8 +185,116 @@ public class LotLineageRepositoryCustomImpl
             Long rootLotId,
             LineageDirection direction
     ) {
-        throw new UnsupportedOperationException(
-                "Lineage traversal is not fully implemented yet"
+        // 1. Traverse based on direction
+        List<TraversalRow> rows = new ArrayList<>();
+        if (direction == LineageDirection.UPSTREAM || direction == LineageDirection.BOTH) {
+            rows.addAll(findUpstreamRows(rootLotId));
+        }
+        if (direction == LineageDirection.DOWNSTREAM || direction == LineageDirection.BOTH) {
+            rows.addAll(findDownstreamRows(rootLotId));
+        }
+
+        // 2. Collect unique lot and transformation IDs from traversal
+        Set<Long> collectedLotIds = new LinkedHashSet<>();
+        Set<Long> collectedTxIds = new LinkedHashSet<>();
+
+        for (TraversalRow row : rows) {
+            if (row.lotId() != null) {
+                collectedLotIds.add(row.lotId());
+            }
+            if (row.transformationId() != null) {
+                collectedTxIds.add(row.transformationId());
+            }
+        }
+
+        // 3. Complete Edge Projection & collect sibling/co-parent lot IDs
+        List<LineageEdge> edges = new ArrayList<>();
+        if (!collectedTxIds.isEmpty()) {
+            MapSqlParameterSource txParams = new MapSqlParameterSource("transformationIds", collectedTxIds);
+
+            // Fetch INPUT edges
+            List<LineageEdge> inputEdges = namedParameterJdbcTemplate.query(
+                    INPUT_EDGES_SQL,
+                    txParams,
+                    (rs, rowNum) -> new LineageEdge(
+                            rs.getLong("lot_id"),
+                            rs.getLong("transformation_id"),
+                            LineageEdge.EdgeType.INPUT,
+                            rs.getBigDecimal("quantity"),
+                            rs.getString("unit") != null ? QuantityUnit.valueOf(rs.getString("unit")) : null
+                    )
+            );
+            edges.addAll(inputEdges);
+            for (LineageEdge edge : inputEdges) {
+                collectedLotIds.add(edge.lotId());
+            }
+
+            // Fetch OUTPUT edges
+            List<LineageEdge> outputEdges = namedParameterJdbcTemplate.query(
+                    OUTPUT_EDGES_SQL,
+                    txParams,
+                    (rs, rowNum) -> new LineageEdge(
+                            rs.getLong("lot_id"),
+                            rs.getLong("transformation_id"),
+                            LineageEdge.EdgeType.OUTPUT,
+                            rs.getBigDecimal("quantity"),
+                            rs.getString("unit") != null ? QuantityUnit.valueOf(rs.getString("unit")) : null
+                    )
+            );
+            edges.addAll(outputEdges);
+            for (LineageEdge edge : outputEdges) {
+                collectedLotIds.add(edge.lotId());
+            }
+        }
+
+        // 4. Complete Lot Node Projection
+        List<LotNode> lots = new ArrayList<>();
+        if (!collectedLotIds.isEmpty()) {
+            MapSqlParameterSource lotParams = new MapSqlParameterSource("lotIds", collectedLotIds);
+            lots = namedParameterJdbcTemplate.query(
+                    LOTS_BY_IDS_SQL,
+                    lotParams,
+                    (rs, rowNum) -> new LotNode(
+                            rs.getLong("id"),
+                            rs.getString("lot_number"),
+                            rs.getString("status") != null ? LotStatus.valueOf(rs.getString("status")) : null,
+                            rs.getBigDecimal("quantity"),
+                            rs.getString("unit") != null ? QuantityUnit.valueOf(rs.getString("unit")) : null
+                    )
+            );
+        }
+
+        // 5. Transformation Node Projection
+        List<TransformationNode> transformations = new ArrayList<>();
+        if (!collectedTxIds.isEmpty()) {
+            MapSqlParameterSource txParams = new MapSqlParameterSource("transformationIds", collectedTxIds);
+            transformations = namedParameterJdbcTemplate.query(
+                    TRANSFORMATIONS_BY_IDS_SQL,
+                    txParams,
+                    (rs, rowNum) -> {
+                        Timestamp occurredTs = rs.getTimestamp("occurred_at");
+                        LocalDateTime occurredAt = occurredTs != null ? occurredTs.toLocalDateTime() : null;
+                        return new TransformationNode(
+                                rs.getLong("id"),
+                                rs.getString("transformation_type") != null
+                                        ? LotTransformationType.valueOf(rs.getString("transformation_type"))
+                                        : null,
+                                occurredAt,
+                                rs.getString("performed_by"),
+                                rs.getBigDecimal("waste_quantity"),
+                                rs.getString("waste_unit") != null ? QuantityUnit.valueOf(rs.getString("waste_unit")) : null
+                        );
+                    }
+            );
+        }
+
+        // 6. Return complete lineage graph
+        return new LotLineageResponse(
+                rootLotId,
+                direction,
+                lots,
+                transformations,
+                edges
         );
     }
 }
