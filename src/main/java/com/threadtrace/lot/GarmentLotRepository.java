@@ -12,6 +12,8 @@ public interface GarmentLotRepository extends JpaRepository<GarmentLot, Long> {
 
     boolean existsByLotNumber(String lotNumber);
 
+    java.util.Optional<GarmentLot> findByLotNumber(String lotNumber);
+
     boolean existsByLotNumberAndIdNot(String lotNumber, Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
