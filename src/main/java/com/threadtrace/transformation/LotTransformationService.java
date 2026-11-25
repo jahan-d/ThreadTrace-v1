@@ -27,12 +27,19 @@ public class LotTransformationService {
 
     private static final String SYSTEM_ACTOR = "system";
 
+    /**
+     * Unique 64-bit domain key for PostgreSQL advisory transaction lock to serialize
+     * graph transformation mutations and prevent concurrent race-condition cycles.
+     */
+    private static final long LINEAGE_GRAPH_ADVISORY_LOCK_KEY = 4287941209871625412L;
+
     private final LotTransformationRepository transformationRepository;
     private final TransformationInputRepository inputRepository;
     private final TransformationOutputRepository outputRepository;
     private final GarmentLotRepository garmentLotRepository;
     private final SupplierRepository supplierRepository;
     private final LotEventService lotEventService;
+    private final LotCycleValidationService cycleValidationService;
 
     public LotTransformationService(
             LotTransformationRepository transformationRepository,
@@ -40,7 +47,8 @@ public class LotTransformationService {
             TransformationOutputRepository outputRepository,
             GarmentLotRepository garmentLotRepository,
             SupplierRepository supplierRepository,
-            LotEventService lotEventService
+            LotEventService lotEventService,
+            LotCycleValidationService cycleValidationService
     ) {
         this.transformationRepository = transformationRepository;
         this.inputRepository = inputRepository;
@@ -48,6 +56,7 @@ public class LotTransformationService {
         this.garmentLotRepository = garmentLotRepository;
         this.supplierRepository = supplierRepository;
         this.lotEventService = lotEventService;
+        this.cycleValidationService = cycleValidationService;
     }
 
     @Transactional
@@ -55,15 +64,21 @@ public class LotTransformationService {
             LotTransformationRequest request
     ) {
 
-        // 1. Validate and lock input lots
+        // 1. Acquire PostgreSQL transaction-scoped advisory lock to serialize graph-level writes
+        transformationRepository.acquireTransactionAdvisoryLock(LINEAGE_GRAPH_ADVISORY_LOCK_KEY);
+
+        // 2. Validate structure, lock input lots (FOR UPDATE), and validate inventory & mass balance
         Map<Long, GarmentLot> inputLots =
                 validateTransformation(request);
 
-        // 2. Determine inherited status
+        // 3. Validate Cycle Prevention (DAG Invariant)
+        cycleValidationService.validateNoCycle(inputLots, request.outputs());
+
+        // 4. Determine inherited status
         LotStatus inheritedStatus =
                 inputLots.get(request.inputs().get(0).lotId()).getStatus();
 
-        // 3. Save transformation record
+        // 5. Save transformation record
         LotTransformation transformation =
                 transformationRepository.save(new LotTransformation(
                         request.transformationType(),
@@ -91,7 +106,7 @@ public class LotTransformationService {
         List<LotTransformationResponse.OutputLotSummary> outputSummaries =
                 new java.util.ArrayList<>();
 
-        // 4. Deduct input inventory and save input lineage
+        // 6. Deduct input inventory and save input lineage
         for (LotTransformationRequest.InputLotRequest input : request.inputs()) {
 
             GarmentLot inputLot = inputLots.get(input.lotId());
@@ -121,7 +136,7 @@ public class LotTransformationService {
             );
         }
 
-        // 5. Create output lots and save output lineage
+        // 7. Create output lots and save output lineage
         for (LotTransformationRequest.OutputLotRequest output : request.outputs()) {
 
             var supplier = supplierRepository.findById(output.supplierId())
